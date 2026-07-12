@@ -8,7 +8,7 @@ module.exports = {
   expo: {
     name: 'YouMe',
     slug: 'youme-r6ymepd1vhtvkihozfunu',
-    owner: 'alemille',
+    owner: 'aiteam91',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/logo-icon.jpg',
