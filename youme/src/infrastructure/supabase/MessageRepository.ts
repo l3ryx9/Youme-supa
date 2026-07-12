@@ -1,30 +1,37 @@
 /**
  * Repository Supabase : Messages — remplace Firebase MessageRepository
- * Utilise Supabase Realtime (postgres_changes) pour les messages en temps réel.
+ * Les messages sont dans une table plate (conversation_id FK).
+ * Supabase Realtime (postgres_changes) remplace onSnapshot Firestore.
  */
 import { supabase, TABLES } from './config';
 import type { IMessageRepository } from '@domain/repositories/IMessageRepository';
-import type { Message, SendMessageDTO, AIAnalysisResult, MessageStatus } from '@domain/entities/Message';
+import type {
+  Message,
+  SendMessageDTO,
+  AIAnalysisResult,
+  MessageStatus,
+} from '@domain/entities/Message';
 
 export class MessageRepository implements IMessageRepository {
   async sendMessage(data: SendMessageDTO): Promise<Message> {
     const now = new Date().toISOString();
     const msgData = {
-      conversation_id: data.conversationId,
-      sender_id: data.senderId,
-      receiver_id: data.receiverId,
-      type: data.type,
-      content: data.content,
-      voice_local_path: data.voiceLocalPath ?? null,
-      voice_duration: data.voiceDuration ?? null,
-      image_local_path: data.imageLocalPath ?? null,
-      video_local_path: data.videoLocalPath ?? null,
-      storage_url: data.storageUrl ?? null,
-      status: 'sent' as MessageStatus,
-      is_deleted: false,
-      ai_analysis: null,
-      created_at: now,
-      updated_at: now,
+      conversation_id:  data.conversationId,
+      sender_id:        data.senderId,
+      receiver_id:      data.receiverId,
+      type:             data.type,
+      content:          data.content,
+      voice_local_path: data.voiceLocalPath  ?? null,
+      voice_duration:   data.voiceDuration   ?? null,
+      image_local_path: data.imageLocalPath  ?? null,
+      video_local_path: data.videoLocalPath  ?? null,
+      storage_url:      data.storageUrl      ?? null,
+      location:         data.location        ?? null,
+      status:           'sent' as MessageStatus,
+      is_deleted:       false,
+      ai_analysis:      null,
+      created_at:       now,
+      updated_at:       now,
     };
 
     const { data: inserted, error } = await supabase
@@ -34,17 +41,17 @@ export class MessageRepository implements IMessageRepository {
       .single();
     if (error) throw new Error(error.message);
 
-    // Mettre à jour le dernier message de la conversation
+    // Mettre à jour le dernier message et updatedAt de la conversation
     await supabase
       .from(TABLES.CONVERSATIONS)
       .update({
         last_message: {
-          id: inserted.id,
-          type: data.type,
-          content: data.content,
-          sender_id: data.senderId,
+          id:         inserted.id,
+          type:       data.type,
+          content:    data.content,
+          sender_id:  data.senderId,
           created_at: now,
-          status: 'sent',
+          status:     'sent',
         },
         updated_at: now,
       })
@@ -105,7 +112,7 @@ export class MessageRepository implements IMessageRepository {
     data: Partial<{ status: MessageStatus; aiAnalysis: AIAnalysisResult }>
   ): Promise<void> {
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
-    if (data.status !== undefined) updates.status = data.status;
+    if (data.status !== undefined)    updates.status      = data.status;
     if (data.aiAnalysis !== undefined) updates.ai_analysis = data.aiAnalysis;
 
     await supabase
@@ -120,7 +127,7 @@ export class MessageRepository implements IMessageRepository {
       .from(TABLES.MESSAGES)
       .update({
         is_deleted: true,
-        content: 'Ce message a été supprimé.',
+        content:    'Ce message a été supprimé.',
         updated_at: new Date().toISOString(),
       })
       .eq('id', id);
@@ -134,7 +141,7 @@ export class MessageRepository implements IMessageRepository {
       .from(TABLES.MESSAGES)
       .update({
         is_deleted: true,
-        content: 'Ce message a été supprimé.',
+        content:    'Ce message a été supprimé.',
         updated_at: new Date().toISOString(),
       })
       .eq('id', messageId)
@@ -152,21 +159,43 @@ export class MessageRepository implements IMessageRepository {
     return (data ?? []).map((row) => this.mapRow(row));
   }
 
+  /**
+   * Marque tous les messages non lus d'un destinataire comme "read".
+   * Équivalent du batch Firestore markMessagesAsRead.
+   */
+  async markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
+    await supabase
+      .from(TABLES.MESSAGES)
+      .update({ status: 'read', updated_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .eq('receiver_id', userId)
+      .neq('status', 'read')
+      .eq('is_deleted', false);
+  }
+
+  /**
+   * Acquitte la réception d'un média :
+   * 1. Supprime le fichier du relay Supabase Storage
+   * 2. Met storage_url à null dans la base
+   * 3. Passe le statut à 'delivered'
+   */
   async ackMediaReceived(
     conversationId: string,
     messageId: string,
     storageUrl: string
   ): Promise<void> {
-    // Supprimer le fichier du relay Supabase Storage
     try {
       const { deleteMediaFromStorage } = await import('./MediaUploadService');
       await deleteMediaFromStorage(storageUrl);
     } catch {}
 
-    // Mettre storage_url à null dans la base
     await supabase
       .from(TABLES.MESSAGES)
-      .update({ storage_url: null, updated_at: new Date().toISOString() })
+      .update({
+        storage_url: null,
+        status:      'delivered',
+        updated_at:  new Date().toISOString(),
+      })
       .eq('id', messageId)
       .eq('conversation_id', conversationId);
   }
@@ -175,22 +204,21 @@ export class MessageRepository implements IMessageRepository {
     conversationId: string,
     callback: (messages: Message[]) => void
   ): () => void {
-    // Charger les messages existants d'abord
+    // Charger l'historique existant immédiatement
     this.getConversationMessages(conversationId).then(callback);
 
-    // Écouter les nouveaux messages en temps réel
+    // Écouter les changements en temps réel
     const channel = supabase
       .channel(`messages:${conversationId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event:  '*',
           schema: 'public',
-          table: TABLES.MESSAGES,
+          table:  TABLES.MESSAGES,
           filter: `conversation_id=eq.${conversationId}`,
         },
         async () => {
-          // Recharger tous les messages à chaque changement
           const messages = await this.getConversationMessages(conversationId);
           callback(messages);
         }
@@ -230,23 +258,26 @@ export class MessageRepository implements IMessageRepository {
 
   private mapRow(row: any): Message {
     return {
-      id: row.id,
-      conversationId: row.conversation_id,
-      senderId: row.sender_id,
-      receiverId: row.receiver_id,
-      type: row.type,
-      content: row.content,
-      voiceLocalPath: row.voice_local_path ?? undefined,
-      voiceDuration: row.voice_duration ?? undefined,
-      imageLocalPath: row.image_local_path ?? undefined,
-      videoLocalPath: row.video_local_path ?? undefined,
-      storageUrl: row.storage_url ?? undefined,
-      status: row.status,
-      aiAnalysis: row.ai_analysis ?? undefined,
-      reactions: row.reactions ?? undefined,
-      isDeleted: row.is_deleted ?? false,
-      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
-      updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
+      id:              row.id,
+      conversationId:  row.conversation_id,
+      senderId:        row.sender_id,
+      receiverId:      row.receiver_id,
+      type:            row.type,
+      content:         row.content,
+      encrypted:       row.encrypted       ?? undefined,
+      nonce:           row.nonce           ?? undefined,
+      voiceLocalPath:  row.voice_local_path ?? undefined,
+      voiceDuration:   row.voice_duration  ?? undefined,
+      imageLocalPath:  row.image_local_path ?? undefined,
+      videoLocalPath:  row.video_local_path ?? undefined,
+      storageUrl:      row.storage_url     ?? undefined,
+      location:        row.location        ?? undefined,
+      status:          row.status,
+      aiAnalysis:      row.ai_analysis     ?? undefined,
+      reactions:       row.reactions       ?? undefined,
+      isDeleted:       row.is_deleted      ?? false,
+      createdAt:       row.created_at ? new Date(row.created_at) : new Date(),
+      updatedAt:       row.updated_at ? new Date(row.updated_at) : new Date(),
     };
   }
 }

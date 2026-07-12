@@ -1,5 +1,6 @@
 /**
  * Repository Supabase : Partenaires — remplace Firebase PartnerRepository
+ * id des lignes partners = "{userId}_{partnerId}" (même convention que Firebase)
  */
 import { supabase, TABLES } from './config';
 import type { IPartnerRepository } from '@domain/repositories/IPartnerRepository';
@@ -85,17 +86,19 @@ export class PartnerRepository implements IPartnerRepository {
       .update({ status: 'accepted', updated_at: now })
       .eq('id', requestId);
 
-    // 2. Créer la conversation et les deux entrées partenaires
+    // 2. Créer la conversation
     await supabase.from(TABLES.CONVERSATIONS).upsert({
       id: conversationId,
       participant_ids: [senderId, receiverId],
+      unread_count: 0,
       created_at: now,
       updated_at: now,
     });
 
+    // 3. Créer les deux lignes partenaires (id = "{userId}_{partnerId}")
     await supabase.from(TABLES.PARTNERS).upsert([
       {
-        id: `${senderId}_partner`,
+        id: `${senderId}_${receiverId}`,
         user_id: senderId,
         partner_id: receiverId,
         partner_username: receiver.username,
@@ -107,7 +110,7 @@ export class PartnerRepository implements IPartnerRepository {
         created_at: now,
       },
       {
-        id: `${receiverId}_partner`,
+        id: `${receiverId}_${senderId}`,
         user_id: receiverId,
         partner_id: senderId,
         partner_username: sender.username,
@@ -135,8 +138,10 @@ export class PartnerRepository implements IPartnerRepository {
   async removePartner(userId: string, partnerId: string): Promise<void> {
     const conversationId = [userId, partnerId].sort().join('_');
     await Promise.all([
-      supabase.from(TABLES.PARTNERS).delete().eq('user_id', userId).eq('partner_id', partnerId),
-      supabase.from(TABLES.PARTNERS).delete().eq('user_id', partnerId).eq('partner_id', userId),
+      supabase.from(TABLES.PARTNERS).delete()
+        .eq('user_id', userId).eq('partner_id', partnerId),
+      supabase.from(TABLES.PARTNERS).delete()
+        .eq('user_id', partnerId).eq('partner_id', userId),
       supabase.from(TABLES.CONVERSATIONS).delete().eq('id', conversationId),
     ]);
   }
@@ -150,11 +155,31 @@ export class PartnerRepository implements IPartnerRepository {
     return (data ?? []).map((row) => this.mapPartner(row));
   }
 
-  async getPartnerRequests(userId: string): Promise<PartnerRequest[]> {
+  /**
+   * Demandes reçues (= getPendingRequests dans l'interface Firebase)
+   */
+  async getPendingRequests(userId: string): Promise<PartnerRequest[]> {
     const { data } = await supabase
       .from(TABLES.PARTNER_REQUESTS)
       .select('*')
       .eq('receiver_id', userId)
+      .eq('status', 'pending');
+    return (data ?? []).map((row) => this.mapRequest(row));
+  }
+
+  /** Alias — utilisé par certains composants */
+  async getPartnerRequests(userId: string): Promise<PartnerRequest[]> {
+    return this.getPendingRequests(userId);
+  }
+
+  /**
+   * Demandes envoyées (= getSentRequests dans l'interface Firebase)
+   */
+  async getSentRequests(userId: string): Promise<PartnerRequest[]> {
+    const { data } = await supabase
+      .from(TABLES.PARTNER_REQUESTS)
+      .select('*')
+      .eq('sender_id', userId)
       .eq('status', 'pending');
     return (data ?? []).map((row) => this.mapRequest(row));
   }
@@ -176,7 +201,12 @@ export class PartnerRepository implements IPartnerRepository {
       .channel(`partners:${userId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: TABLES.PARTNERS, filter: `user_id=eq.${userId}` },
+        {
+          event: '*',
+          schema: 'public',
+          table: TABLES.PARTNERS,
+          filter: `user_id=eq.${userId}`,
+        },
         async () => {
           const partners = await this.getPartners(userId);
           callback(partners);
@@ -188,7 +218,7 @@ export class PartnerRepository implements IPartnerRepository {
   }
 
   subscribeToRequests(userId: string, callback: (requests: PartnerRequest[]) => void): () => void {
-    this.getPartnerRequests(userId).then(callback);
+    this.getPendingRequests(userId).then(callback);
 
     const channel = supabase
       .channel(`partner_requests:${userId}`)
@@ -201,7 +231,7 @@ export class PartnerRepository implements IPartnerRepository {
           filter: `receiver_id=eq.${userId}`,
         },
         async () => {
-          const requests = await this.getPartnerRequests(userId);
+          const requests = await this.getPendingRequests(userId);
           callback(requests);
         }
       )
