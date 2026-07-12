@@ -162,6 +162,26 @@ export class UserRepository implements IUserRepository {
       .eq('id', userId);
   }
 
+  async updateAiEnabled(id: string, enabled: boolean): Promise<void> {
+    await supabase
+      .from(TABLES.USERS)
+      .update({ ai_enabled: enabled, updated_at: new Date().toISOString() })
+      .eq('id', id);
+  }
+
+  async updateOnlineStatus(id: string, isOnline: boolean): Promise<void> {
+    const now = new Date().toISOString();
+    await supabase
+      .from(TABLES.USERS)
+      .update({ is_online: isOnline, last_seen: now, updated_at: now })
+      .eq('id', id);
+    // Sync du profil public (source de vérité pour les partenaires).
+    await supabase
+      .from(TABLES.PUBLIC_PROFILES)
+      .update({ is_online: isOnline, last_seen: now })
+      .eq('id', id);
+  }
+
   subscribeToUser(id: string, callback: (user: User) => void): () => void {
     const channel = supabase
       .channel(`user:${id}`)
@@ -169,6 +189,33 @@ export class UserRepository implements IUserRepository {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: TABLES.USERS, filter: `id=eq.${id}` },
         (payload) => callback(this.mapRowToUser(payload.new))
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }
+
+  /**
+   * Abonnement temps réel au profil public d'un utilisateur (pseudo, statut en
+   * ligne, dernière connexion). Remplace l'ancien onSnapshot Firestore sur
+   * `public_profiles/{id}`. Émet immédiatement la valeur courante, puis à chaque
+   * mise à jour.
+   */
+  subscribeToPublicProfile(
+    id: string,
+    callback: (profile: UserProfile | null) => void
+  ): () => void {
+    // Valeur initiale
+    this.getPublicProfile(id).then(callback).catch(() => callback(null));
+
+    const channel = supabase
+      .channel(`public_profile:${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: TABLES.PUBLIC_PROFILES, filter: `id=eq.${id}` },
+        (payload) => {
+          if (payload.eventType === 'DELETE') { callback(null); return; }
+          callback(this.mapRowToProfile(payload.new));
+        }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };

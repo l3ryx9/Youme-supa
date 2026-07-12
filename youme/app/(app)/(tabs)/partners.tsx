@@ -21,7 +21,7 @@ import { useYoumeColors, YoumeColors, SPACING, TYPOGRAPHY, BORDER_RADIUS } from 
 import { Avatar } from '../../../src/presentation/components/common/Avatar';
 import { useAuthStore } from '../../../src/presentation/stores/authStore';
 import { usePartnerStore } from '../../../src/presentation/stores/partnerStore';
-import { partnerRepository } from '../../../src/infrastructure/firebase/PartnerRepository';
+import { partnerRepository } from '../../../src/infrastructure/supabase/PartnerRepository';
 import type { Partner, PartnerRequest } from '../../../src/domain/entities/Partner';
 
 type Tab = 'partners' | 'requests' | 'search';
@@ -55,7 +55,7 @@ export default function PartnersScreen() {
     if (!searchQuery.trim() || searchQuery.length < 3) return;
     setIsSearching(true);
     try {
-      const { userRepository } = await import('../../../src/infrastructure/firebase/UserRepository');
+      const { userRepository } = await import('../../../src/infrastructure/supabase/UserRepository');
       const results = await userRepository.searchUsersByUsername(searchQuery);
       setSearchResults(results.filter((r) => r.id !== user?.id));
     } catch (error) {

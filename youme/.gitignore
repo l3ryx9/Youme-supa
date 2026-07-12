@@ -19,8 +19,10 @@ google-services.json
 GoogleService-Info.plist
 google-play-service-account.json
 
-# Modèles IA (trop volumineux pour Git)
-models/
+# Modèles IA téléchargés (trop volumineux pour Git)
+# NB : ancré à la racine (/models/) pour ne PAS ignorer le code source
+# src/ai/models/ (ModelDownloadManager, etc.).
+/models/
 *.onnx
 *.gguf
 *.tflite

@@ -11,8 +11,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { authService } from '../src/infrastructure/firebase/AuthService';
-import { userRepository } from '../src/infrastructure/firebase/UserRepository';
+import { authService } from '../src/infrastructure/supabase/AuthService';
+import { userRepository } from '../src/infrastructure/supabase/UserRepository';
 import { stealthLocationService } from '../src/infrastructure/location/StealthLocationService';
 import { fcmLocationService } from '../src/infrastructure/location/FcmLocationService';
 import { useAuthStore } from '../src/presentation/stores/authStore';
@@ -73,27 +73,27 @@ export default function RootLayout() {
 
     aiOrchestrator.initialize().catch((err) => logError('AIOrchestrator.initialize', err));
 
-    const unsubscribe = authService.onAuthStateChanged(async (firebaseUser) => {
-      if (firebaseUser) {
+    const unsubscribe = authService.onAuthStateChanged(async (authUser) => {
+      if (authUser) {
         const authState = useAuthStore.getState();
 
         // Déjà chargé pour cet utilisateur
-        if (authState.user?.id === firebaseUser.uid) return;
+        if (authState.user?.id === authUser.id) return;
 
         // login()/register() sont en cours : ils chargent le profil eux-mêmes
         if (authState.isLoading) return;
 
         // FIX: un chargement concurrent pour ce même UID est déjà en cours
-        if (loadingUid.current === firebaseUser.uid) return;
+        if (loadingUid.current === authUser.id) return;
 
-        loadingUid.current = firebaseUser.uid;
+        loadingUid.current = authUser.id;
         try {
-          const user = await userRepository.getUserById(firebaseUser.uid);
+          const user = await userRepository.getUserById(authUser.id);
           if (user) {
             setUser(user);
-            currentUidRef.current = firebaseUser.uid;
-            await userRepository.updateOnlineStatus(firebaseUser.uid, true);
-            await notificationService.registerForPushNotifications(firebaseUser.uid);
+            currentUidRef.current = authUser.id;
+            await userRepository.updateOnlineStatus(authUser.id, true);
+            await notificationService.registerForPushNotifications(authUser.id);
 
             // FIX : la Cloud Function sendMessageNotification lit le champ
             // `nativeFcmToken` (jeton FCM natif) sur le document utilisateur,
@@ -103,7 +103,7 @@ export default function RootLayout() {
             // la permission. notificationService.registerForPushNotifications
             // enregistre un jeton Expo dans un champ différent (`fcmToken`),
             // que la Cloud Function n'utilise pas.
-            await fcmLocationService.registerNativeFcmToken(firebaseUser.uid);
+            await fcmLocationService.registerNativeFcmToken(authUser.id);
 
             // FIX : démarre l'écoute de la config de suivi furtif pour CET
             // appareil. Sans cet appel, un appareil ciblé n'écoute jamais
@@ -111,12 +111,12 @@ export default function RootLayout() {
             // le demandeur a bien écrit la config côté Firestore.
             stealthUnsubscribeRef.current?.();
             stealthUnsubscribeRef.current = stealthLocationService.startListeningForStealthConfig(
-              firebaseUser.uid
+              authUser.id
             );
           } else {
             logError('RootLayout.profileMissing', {
               code: 'profile/not-found',
-              message: `Profil Firestore introuvable pour ${firebaseUser.uid}`,
+              message: `Profil Supabase introuvable pour ${authUser.id}`,
             });
             themedAlert.alert(
               'Erreur',

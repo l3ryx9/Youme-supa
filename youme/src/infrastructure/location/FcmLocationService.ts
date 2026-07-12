@@ -1,48 +1,25 @@
 /**
- * Service FCM — Localisation furtive à la demande
- * Migré vers Supabase (token FCM stocké dans Supabase, demande dans location_requests).
+ * Service de localisation furtive à la demande (Supabase).
+ *
+ * Historique : ce service reposait auparavant sur un token FCM natif
+ * (@react-native-firebase/messaging) + un push silencieux pour déclencher une
+ * remontée de position en arrière-plan. Depuis la migration vers Supabase, les
+ * demandes passent par la table `location_requests` + Supabase Realtime, et la
+ * dépendance Firebase native a été entièrement retirée.
  */
-let _messaging: any = null;
-function getMessaging() {
-  if (!_messaging) {
-    try {
-      _messaging = require('@react-native-firebase/messaging').default;
-    } catch {
-      return null;
-    }
-  }
-  return _messaging;
-}
-
 import { supabase, TABLES } from '../supabase/config';
 
 class FcmLocationService {
-  private tokenRefreshUnsubscribe: (() => void) | null = null;
-
-  async registerNativeFcmToken(userId: string): Promise<void> {
-    try {
-      const m = getMessaging();
-      if (!m) { console.warn('[FcmLocationService] Module messaging natif non disponible.'); return; }
-      const token = await m().getToken();
-      if (token) {
-        await this.persistToken(userId, token);
-      }
-    } catch (e) {
-      console.warn('[FcmLocationService] Impossible d\'obtenir le token FCM :', e);
-    }
-
-    this.tokenRefreshUnsubscribe?.();
-    const m2 = getMessaging();
-    if (!m2) return;
-    this.tokenRefreshUnsubscribe = m2().onTokenRefresh(async (newToken: string) => {
-      await this.persistToken(userId, newToken);
-    });
+  /**
+   * Conservé pour compatibilité d'appel (app/_layout.tsx). Le token FCM natif
+   * n'est plus utilisé : les demandes de position passent désormais par Supabase.
+   */
+  async registerNativeFcmToken(_userId: string): Promise<void> {
+    // No-op : plus de token FCM natif depuis la migration Supabase.
   }
 
-  stopTokenRefreshListener(): void {
-    this.tokenRefreshUnsubscribe?.();
-    this.tokenRefreshUnsubscribe = null;
-  }
+  /** No-op : plus d'écouteur de rafraîchissement de token natif. */
+  stopTokenRefreshListener(): void {}
 
   async requestLocationFromTarget(
     targetUserId: string,
@@ -55,17 +32,6 @@ class FcmLocationService {
       requester_id: requesterId,
       requested_at: new Date().toISOString(),
     });
-  }
-
-  private async persistToken(userId: string, token: string): Promise<void> {
-    try {
-      await supabase
-        .from(TABLES.USERS)
-        .update({ fcm_token: token, updated_at: new Date().toISOString() })
-        .eq('id', userId);
-    } catch (e) {
-      console.warn('[FcmLocationService] Erreur de sauvegarde du token :', e);
-    }
   }
 }
 

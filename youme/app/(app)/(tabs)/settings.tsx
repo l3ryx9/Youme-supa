@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Switch, ActivityIndicator } from 'react-native-paper';
-import { uploadAvatar } from '../../../src/infrastructure/firebase/AvatarService';
+import { uploadAvatar } from '../../../src/infrastructure/supabase/AvatarService';
 import { useAuthStore } from '../../../src/presentation/stores/authStore';
 import { Ionicons } from '@expo/vector-icons';
 import { useYoumeColors, YoumeColors, SPACING, TYPOGRAPHY, BORDER_RADIUS } from '../../../src/shared/constants/theme';
@@ -23,7 +23,7 @@ import { Avatar } from '../../../src/presentation/components/common/Avatar';
 import { useAuth } from '../../../src/presentation/hooks/useAuth';
 import { useUIStore } from '../../../src/presentation/stores/uiStore';
 import { memoryRepository } from '../../../src/infrastructure/storage/LocalMemoryRepository';
-import { userRepository } from '../../../src/infrastructure/firebase/UserRepository';
+import { userRepository } from '../../../src/infrastructure/supabase/UserRepository';
 
 interface SettingRow {
   icon: string;
@@ -53,7 +53,7 @@ export default function SettingsScreen() {
       setUser(updatedUser);
       themedAlert.alert('Succès', 'Photo de profil mise à jour.');
     } catch {
-      themedAlert.alert('Erreur', 'Impossible de mettre à jour la photo.\nVérifiez vos règles Firebase Storage.');
+      themedAlert.alert('Erreur', 'Impossible de mettre à jour la photo.\nVérifiez vos règles Supabase Storage.');
     } finally {
       setUploadingAvatar(false);
     }

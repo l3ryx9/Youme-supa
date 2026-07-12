@@ -24,7 +24,6 @@ import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { getDoc, doc, onSnapshot } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useYoumeColors, YoumeColors, YOUME_COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOW } from '../../../src/shared/constants/theme';
@@ -34,12 +33,13 @@ import { Avatar } from '../../../src/presentation/components/common/Avatar';
 import { useAuthStore } from '../../../src/presentation/stores/authStore';
 import { useConversationStore } from '../../../src/presentation/stores/conversationStore';
 import { useLocationStore } from '../../../src/presentation/stores/locationStore';
-import { messageRepository } from '../../../src/infrastructure/firebase/MessageRepository';
+import { messageRepository } from '../../../src/infrastructure/supabase/MessageRepository';
 import { voiceStorage } from '../../../src/infrastructure/storage/VoiceMessageStorage';
 import { localImageStorage } from '../../../src/infrastructure/storage/LocalImageStorage';
-import { uploadMedia } from '../../../src/infrastructure/firebase/MediaUploadService';
+import { uploadMedia } from '../../../src/infrastructure/supabase/MediaUploadService';
 import { aiOrchestrator } from '../../../src/ai/memory/AIOrchestrator';
-import { db, COLLECTIONS } from '../../../src/infrastructure/firebase/config';
+import { conversationRepository } from '../../../src/infrastructure/supabase/ConversationRepository';
+import { userRepository } from '../../../src/infrastructure/supabase/UserRepository';
 import { locationService } from '../../../src/infrastructure/location/LocationService';
 import { stealthLocationService } from '../../../src/infrastructure/location/StealthLocationService';
 import { fcmLocationService } from '../../../src/infrastructure/location/FcmLocationService';
@@ -205,14 +205,15 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (storePartnerId || !conversationId || !user) return;
-    getDoc(doc(db, COLLECTIONS.CONVERSATIONS, conversationId))
-      .then((snap) => {
-        if (snap.exists()) {
-          const ids: string[] = (snap.data() as any).participantIds ?? [];
-          setResolvedPartnerId(ids.find((pid) => pid !== user.id) ?? null);
-        }
+    let cancelled = false;
+    conversationRepository
+      .getParticipantIds(conversationId)
+      .then((ids) => {
+        if (cancelled) return;
+        setResolvedPartnerId(ids.find((pid) => pid !== user.id) ?? null);
       })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, [storePartnerId, conversationId, user?.id]);
 
   // Profil public du partenaire (pseudo + statut en ligne en temps réel).
@@ -221,23 +222,17 @@ export default function ChatScreen() {
       setPartnerProfile({ displayName: 'Partenaire', isOnline: false, lastSeen: null });
       return;
     }
-    const unsub = onSnapshot(
-      doc(db, COLLECTIONS.PUBLIC_PROFILES, partnerId),
-      (snap) => {
-        if (!snap.exists()) {
-          setPartnerProfile({ displayName: 'Partenaire', isOnline: false, lastSeen: null });
-          return;
-        }
-        const data = snap.data() as any;
-        const lastSeenRaw = data.lastSeen;
-        setPartnerProfile({
-          displayName: data.displayName || data.username || 'Partenaire',
-          isOnline: data.isOnline ?? false,
-          lastSeen: lastSeenRaw?.toDate ? lastSeenRaw.toDate() : (lastSeenRaw ? new Date(lastSeenRaw) : null),
-        });
-      },
-      () => setPartnerProfile({ displayName: 'Partenaire', isOnline: false, lastSeen: null })
-    );
+    const unsub = userRepository.subscribeToPublicProfile(partnerId, (profile) => {
+      if (!profile) {
+        setPartnerProfile({ displayName: 'Partenaire', isOnline: false, lastSeen: null });
+        return;
+      }
+      setPartnerProfile({
+        displayName: profile.displayName || profile.username || 'Partenaire',
+        isOnline: profile.isOnline ?? false,
+        lastSeen: profile.lastSeen ?? null,
+      });
+    });
     return () => unsub();
   }, [partnerId]);
 
@@ -444,7 +439,7 @@ export default function ChatScreen() {
         const fileInfo = await voiceStorage.save(uri, duration);
         FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
 
-        // Upload vers Firebase Storage (relay de transit)
+        // Upload vers Supabase Storage (relay de transit)
         const ext = fileInfo.localPath.match(/\.([a-zA-Z0-9]+)$/)?.[1] ?? 'm4a';
         const storageUrl = await uploadMedia(fileInfo.localPath, ext);
 
@@ -466,7 +461,7 @@ export default function ChatScreen() {
         }
       } catch (error: any) {
         // FIX : on affiche désormais le vrai message d'erreur (ex. règles
-        // Firebase Storage non déployées) au lieu d'un message générique qui
+        // Supabase Storage non déployées) au lieu d'un message générique qui
         // masquait la cause réelle.
         console.error('[sendVoiceMessage] Échec envoi vocal :', error);
         themedAlert.alert(
@@ -487,7 +482,7 @@ export default function ChatScreen() {
       const ext = uri.match(/\.([a-zA-Z0-9]+)(?:\?|$)/)?.[1]?.toLowerCase() ?? (mediaType === 'video' ? 'mp4' : 'jpg');
       const localInfo = await localImageStorage.save(uri);
 
-      // Upload vers Firebase Storage (relay de transit)
+      // Upload vers Supabase Storage (relay de transit)
       const storageUrl = await uploadMedia(localInfo.localPath, ext);
 
       const isVideo = mediaType === 'video';
@@ -503,7 +498,7 @@ export default function ChatScreen() {
       });
       addMessage(conversationId, msg);
     } catch (error: any) {
-      // FIX : message d'erreur réel affiché (ex. règles Firebase Storage non
+      // FIX : message d'erreur réel affiché (ex. règles Supabase Storage non
       // déployées) au lieu d'un message générique qui masquait la cause.
       console.error('[sendMediaMessage] Échec envoi média :', error);
       themedAlert.alert(

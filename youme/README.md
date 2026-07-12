@@ -81,12 +81,21 @@ Créez deux buckets dans **Storage** :
 - `avatars` — public, pour les photos de profil
 - `temp-media` — privé, pour le relay de médias (images/vidéos)
 
-### 5. Lancer l'application
+### 5. Créer un build de développement (expo.dev / EAS)
+
+> ⚠️ Cette application utilise des modules natifs (MMKV, onnxruntime,
+> react-native-maps, Firebase natif…). Elle **ne fonctionne pas dans Expo Go** :
+> il faut un *development build* généré via EAS (expo.dev).
 
 ```bash
-npx expo start          # QR code pour Expo Go
-npx expo start --android # Émulateur Android
-npx expo start --ios    # Simulateur iOS
+# 1. Générer et installer un build de développement (une fois par appareil)
+eas build --profile development --platform android
+eas build --profile development --platform ios
+
+# 2. Démarrer le serveur de dev, puis ouvrir le build installé
+npx expo start --dev-client            # Appareil / émulateur avec le dev build
+npx expo start --dev-client --android  # Émulateur Android
+npx expo start --dev-client --ios      # Simulateur iOS
 ```
 
 ---

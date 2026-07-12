@@ -22,8 +22,7 @@ import { formatConversationDate } from '../../../src/shared/utils/dateUtils';
 import { useAuthStore } from '../../../src/presentation/stores/authStore';
 import { useConversationStore } from '../../../src/presentation/stores/conversationStore';
 import type { ConversationWithPartner } from '../../../src/domain/entities/Conversation';
-import { collection, query, where, onSnapshot, orderBy, deleteDoc, doc, getDoc } from 'firebase/firestore';
-import { db, COLLECTIONS } from '../../../src/infrastructure/firebase/config';
+import { conversationRepository } from '../../../src/infrastructure/supabase/ConversationRepository';
 
 export default function ConversationsScreen() {
   const { user } = useAuthStore();
@@ -35,69 +34,13 @@ export default function ConversationsScreen() {
 
   useEffect(() => {
     if (!user) return;
-
-    const q = query(
-      collection(db, COLLECTIONS.CONVERSATIONS),
-      where('participantIds', 'array-contains', user.id),
-      orderBy('updatedAt', 'desc')
+    // Le profil public (pseudo, avatar, statut en ligne) est la source de
+    // vérité pour l'affichage du partenaire ; le ConversationRepository l'y
+    // résout automatiquement pour chaque conversation.
+    const unsubscribe = conversationRepository.subscribeToConversations(
+      user.id,
+      setConversations
     );
-
-    const unsubscribe = onSnapshot(q, async (snap) => {
-      // FIX : le document `conversations` n'a jamais stocké `partnerUsername` /
-      // `partnerDisplayName` (seule la collection séparée `partners` les
-      // contient, une par sens de la relation). Le code retombait donc
-      // toujours sur `partnerId` — l'UID Firebase brut — d'où un nom de
-      // partenaire qui ressemble à une suite de chiffres et lettres.
-      // On va maintenant chercher le vrai surnom dans le profil public
-      // (source de vérité, toujours à jour même si le partenaire renomme
-      // son compte), avec mise en cache simple pour éviter de relire le
-      // même profil à chaque changement de conversation.
-      const partnerIds = Array.from(
-        new Set(
-          snap.docs
-            .map((d) => (d.data().participantIds as string[]).find((id) => id !== user.id))
-            .filter((id): id is string => !!id)
-        )
-      );
-
-      const profileEntries = await Promise.all(
-        partnerIds.map(async (id) => {
-          try {
-            const profSnap = await getDoc(doc(db, COLLECTIONS.PUBLIC_PROFILES, id));
-            return [id, profSnap.exists() ? profSnap.data() : null] as const;
-          } catch {
-            return [id, null] as const;
-          }
-        })
-      );
-      const profiles = new Map(profileEntries);
-
-      const convs: ConversationWithPartner[] = [];
-      for (const docSnap of snap.docs) {
-        const data = docSnap.data();
-        const partnerId = (data.participantIds as string[]).find((id) => id !== user.id);
-        if (!partnerId) continue;
-
-        const profile = profiles.get(partnerId);
-
-        convs.push({
-          id: docSnap.id,
-          participantIds: data.participantIds,
-          lastMessage: data.lastMessage,
-          unreadCount: data.unreadCount ?? 0,
-          createdAt: data.createdAt?.toDate() ?? new Date(),
-          updatedAt: data.updatedAt?.toDate() ?? new Date(),
-          partnerId,
-          partnerUsername: profile?.username ?? data.partnerUsername ?? 'partenaire',
-          partnerDisplayName: profile?.displayName ?? data.partnerDisplayName ?? 'Partenaire',
-          partnerPhotoURL: profile?.photoURL ?? data.partnerPhotoURL,
-          partnerIsOnline: profile?.isOnline ?? data.partnerIsOnline ?? false,
-          partnerLastSeen: profile?.lastSeen?.toDate?.() ?? data.partnerLastSeen?.toDate() ?? new Date(),
-        });
-      }
-      setConversations(convs);
-    });
-
     return () => unsubscribe();
   }, [user]);
 
@@ -111,7 +54,7 @@ export default function ConversationsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteDoc(doc(db, COLLECTIONS.CONVERSATIONS, item.id));
+              await conversationRepository.deleteConversation(item.id);
               removeConversation(item.id);
             } catch {
               Alert.alert('Erreur', 'Impossible de supprimer la conversation.');
