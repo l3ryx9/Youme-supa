@@ -5,7 +5,7 @@
   },
   "build": {
     "development": {
-      "node": "20.19.4",
+      "node": "22.14.0",
       "developmentClient": true,
       "distribution": "internal",
       "env": {
@@ -23,7 +23,7 @@
       }
     },
     "preview": {
-      "node": "20.19.4",
+      "node": "22.14.0",
       "distribution": "internal",
       "android": {
         "buildType": "apk"
@@ -43,7 +43,7 @@
       }
     },
     "production": {
-      "node": "20.19.4",
+      "node": "22.14.0",
       "autoIncrement": true,
       "env": {
         "APP_ENV": "production",
