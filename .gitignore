@@ -21,6 +21,7 @@ google-play-service-account.json
 
 # Modèles IA (trop volumineux pour Git)
 models/
+!src/ai/models/
 *.onnx
 *.gguf
 *.tflite
