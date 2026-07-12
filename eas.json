@@ -1,0 +1,76 @@
+{
+  "cli": {
+    "version": ">= 10.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "node": "22.14.0",
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "development",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://meqofipcazdqwodkwmie.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcW9maXBjYXpkcXdvZGt3bWllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDUzODUsImV4cCI6MjA5OTM4MTM4NX0.fqMaOKSPnqUv2JcL2gwkI3JOe85I6vQiAZWc45K2znU",
+        "EXPO_PUBLIC_GEMINI_API_KEY": "YOUR_GEMINI_API_KEY",
+        "EXPO_PUBLIC_GEMINI_MODEL": "gemini-2.5-flash",
+        "GOOGLE_MAPS_API_KEY_ANDROID": "YOUR_GOOGLE_MAPS_API_KEY",
+        "EXPO_PUBLIC_APP_ENV": "development",
+        "EXPO_PUBLIC_AI_ANALYSIS_DELAY_MS": "2000",
+        "EXPO_PUBLIC_AI_ENABLED_DEFAULT": "true",
+        "EXPO_PUBLIC_INCONSISTENCY_THRESHOLD": "70",
+        "EXPO_PUBLIC_GEMINI_TRIGGER_COUNT": "3"
+      }
+    },
+    "preview": {
+      "node": "22.14.0",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "preview",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://meqofipcazdqwodkwmie.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcW9maXBjYXpkcXdvZGt3bWllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDUzODUsImV4cCI6MjA5OTM4MTM4NX0.fqMaOKSPnqUv2JcL2gwkI3JOe85I6vQiAZWc45K2znU",
+        "EXPO_PUBLIC_GEMINI_API_KEY": "YOUR_GEMINI_API_KEY",
+        "EXPO_PUBLIC_GEMINI_MODEL": "gemini-2.5-flash",
+        "GOOGLE_MAPS_API_KEY_ANDROID": "YOUR_GOOGLE_MAPS_API_KEY",
+        "EXPO_PUBLIC_APP_ENV": "preview",
+        "EXPO_PUBLIC_AI_ANALYSIS_DELAY_MS": "2000",
+        "EXPO_PUBLIC_AI_ENABLED_DEFAULT": "true",
+        "EXPO_PUBLIC_INCONSISTENCY_THRESHOLD": "70",
+        "EXPO_PUBLIC_GEMINI_TRIGGER_COUNT": "3"
+      }
+    },
+    "production": {
+      "node": "22.14.0",
+      "autoIncrement": true,
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://meqofipcazdqwodkwmie.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lcW9maXBjYXpkcXdvZGt3bWllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4MDUzODUsImV4cCI6MjA5OTM4MTM4NX0.fqMaOKSPnqUv2JcL2gwkI3JOe85I6vQiAZWc45K2znU",
+        "EXPO_PUBLIC_GEMINI_API_KEY": "YOUR_GEMINI_API_KEY",
+        "EXPO_PUBLIC_GEMINI_MODEL": "gemini-2.5-flash",
+        "GOOGLE_MAPS_API_KEY_ANDROID": "YOUR_GOOGLE_MAPS_API_KEY",
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_AI_ANALYSIS_DELAY_MS": "2000",
+        "EXPO_PUBLIC_AI_ENABLED_DEFAULT": "true",
+        "EXPO_PUBLIC_INCONSISTENCY_THRESHOLD": "70",
+        "EXPO_PUBLIC_GEMINI_TRIGGER_COUNT": "3"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal"
+      },
+      "ios": {
+        "appleId": "YOUR_APPLE_ID",
+        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+      }
+    }
+  }
+}

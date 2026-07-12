@@ -1,0 +1,51 @@
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+.DS_Store
+.env
+.env.local
+.env.production
+
+# Google Services — fichiers sensibles
+google-services.json
+GoogleService-Info.plist
+google-play-service-account.json
+
+# Modèles IA (trop volumineux pour Git)
+models/
+*.onnx
+*.gguf
+*.tflite
+*.bin
+
+# Coverage
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# Metro bundler
+.metro-health-check*
+
+# Watchman
+.watchman*
+
+# Expo
+.expo-shared/
+expo-env.d.ts
+
+# EAS
+.easignore
+
+# Logs
+*.log
+yarn-error.log
