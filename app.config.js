@@ -7,7 +7,7 @@
 module.exports = {
   expo: {
     name: 'YouMe',
-    slug: 'youme-r6ymepd1vhtvkihozfunu',
+    slug: 'youme',
     owner: 'aiteam91',
     version: '1.0.0',
     orientation: 'portrait',
