@@ -7,7 +7,7 @@
 module.exports = {
   expo: {
     name: 'YouMe',
-    slug: 'youme',
+    slug: 'youme-r6ymepd1vhtvkihozfunu',
     owner: 'alemille',
     version: '1.0.0',
     orientation: 'portrait',
@@ -109,7 +109,6 @@ module.exports = {
           isAndroidForegroundServiceEnabled: true,
         },
       ],
-      '@react-native-firebase/app',
       [
         'expo-build-properties',
         {
@@ -131,7 +130,7 @@ module.exports = {
         origin: false,
       },
       eas: {
-        projectId: '418495b0-a4e0-4481-8fc3-7f4f620f6dcb',
+        projectId: '253d300d-aec3-4c1c-9ae7-23fbfc1155aa',
       },
     },
     description: 'YouMe Intelligente — Application de messagerie privée avec IA locale',
