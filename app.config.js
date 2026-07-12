@@ -128,7 +128,7 @@ module.exports = {
         origin: false,
       },
       eas: {
-        projectId: '253d300d-aec3-4c1c-9ae7-23fbfc1155aa',
+        projectId: '46b2c6a8-5ee9-4eb2-991d-5517fe2fa03a',
       },
     },
     description: 'YouMe Intelligente — Application de messagerie privée avec IA locale',
