@@ -312,13 +312,53 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.location_shares;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.stealth_tracking;
 
 -- ============================================================
--- STORAGE BUCKETS (à créer manuellement dans le Dashboard)
+-- STORAGE BUCKETS
 -- ============================================================
--- Bucket "avatars"     : public = true  (photos de profil persistantes)
---   Chemin : avatars/{userId}.jpg
---   Politique write : auth.uid() == userId
---
--- Bucket "temp-media"  : public = false (relay médias, supprimé après DL)
---   Chemin : temp_media/{uuid}.{ext}
---   Politique write : authentifié uniquement
---   Politique read  : authentifié uniquement (URL signée 1h)
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES
+  ('avatars',    'avatars',    true,  5242880,  ARRAY['image/jpeg','image/png','image/webp']),
+  ('temp-media', 'temp-media', false, 52428800, ARRAY['image/jpeg','image/png','image/webp','video/mp4','video/quicktime','audio/mpeg','audio/mp4','audio/wav','audio/ogg'])
+ON CONFLICT (id) DO NOTHING;
+
+-- ── Storage RLS ───────────────────────────────────────────────
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- avatars : lecture publique, écriture par le propriétaire
+CREATE POLICY "avatars_select_public"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars');
+
+CREATE POLICY "avatars_insert_own"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "avatars_update_own"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "avatars_delete_own"
+  ON storage.objects FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- temp-media : lecture et écriture pour les utilisateurs connectés
+CREATE POLICY "temp_media_select_auth"
+  ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'temp-media');
+
+CREATE POLICY "temp_media_insert_auth"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'temp-media');
+
+CREATE POLICY "temp_media_delete_auth"
+  ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'temp-media');
