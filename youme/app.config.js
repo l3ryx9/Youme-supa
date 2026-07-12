@@ -40,7 +40,6 @@ module.exports = {
           "YouMe Intelligente nécessite l'accès à la position en arrière-plan pour continuer le partage de position quand l'écran est verrouillé.",
         UIBackgroundModes: ['location'],
       },
-      googleServicesFile: './GoogleService-Info.plist',
     },
     android: {
       package: 'com.youme24.appname',
@@ -74,7 +73,6 @@ module.exports = {
         'android.permission.FOREGROUND_SERVICE',
         'android.permission.FOREGROUND_SERVICE_LOCATION',
       ],
-      googleServicesFile: './google-services.json',
     },
     web: {
       bundler: 'metro',
