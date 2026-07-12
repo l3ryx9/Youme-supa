@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// Règles Firebase Storage — YouMe Intelligente
+//
+// IMPORTANT : Ces règles n'ont jamais été déployées.
+// Firebase Storage utilisait les règles par défaut (tout refuser),
+// ce qui bloquait l'envoi de photos, vidéos et messages vocaux.
+//
+// Pour déployer : firebase deploy --only storage
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Relay de transit pour les messages vocaux, photos et vidéos.
+    // N'importe quel utilisateur connecté peut y déposer un fichier et le
+    // télécharger. Le contrôle d'accès réel se fait via les URLs de
+    // téléchargement, partagées uniquement entre les participants via Firestore.
+    match /temp_media/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                      request.resource.size < 50 * 1024 * 1024;
+      allow delete: if isAuthenticated();
+    }
+
+    // Avatars des utilisateurs
+    match /avatars/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                      fileName == request.auth.uid + '.jpg' &&
+                      request.resource.size < 10 * 1024 * 1024;
+      allow delete: if isAuthenticated() &&
+                      fileName == request.auth.uid + '.jpg';
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
